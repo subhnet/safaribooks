@@ -183,9 +183,9 @@ class Display:
 
     def state(self, origin, done):
         progress = int(done * 100 / origin)
-        bar = int(progress * (self.columns - 11) / 100)
         if self.state_status.value < progress:
             self.state_status.value = progress
+            bar = int(progress * (self.columns - 11) / 100)
             sys.stdout.write(
                 "\r    " + self.SH_BG_YELLOW + "[" + ("#" * bar).ljust(self.columns - 11, "-") + "]" +
                 self.SH_DEFAULT + ("%4s" % progress) + "%" + ("\n" if progress == 100 else "")
@@ -563,8 +563,12 @@ class SafariBooks:
         if response["count"] > sys.getrecursionlimit():
             sys.setrecursionlimit(response["count"])
 
-        result = []
-        result.extend([c for c in response["results"] if "cover" in c["filename"] or "cover" in c["title"]])
+        result = [
+            c
+            for c in response["results"]
+            if "cover" in c["filename"] or "cover" in c["title"]
+        ]
+
         for c in result:
             del response["results"][response["results"].index(c)]
 
@@ -653,9 +657,8 @@ class SafariBooks:
         return None
 
     def parse_html(self, root, first_page=False):
-        if random() > 0.8:
-            if len(root.xpath("//div[@class='controls']/a/text()")):
-                self.display.exit(self.display.api_error(" "))
+        if random() > 0.8 and len(root.xpath("//div[@class='controls']/a/text()")):
+            self.display.exit(self.display.api_error(" "))
 
         book_content = root.xpath("//div[@id='sbo-rt-content']")
         if not len(book_content):
@@ -1020,11 +1023,13 @@ class SafariBooks:
 
         navmap, _, max_depth = self.parse_toc(response)
         return self.TOC_NCX.format(
-            (self.book_info["isbn"] if self.book_info["isbn"] else self.book_id),
+            self.book_info["isbn"] or self.book_id,
             max_depth,
             self.book_title,
-            ", ".join(aut.get("name", "") for aut in self.book_info.get("authors", [])),
-            navmap
+            ", ".join(
+                aut.get("name", "") for aut in self.book_info.get("authors", [])
+            ),
+            navmap,
         )
 
     def create_epub(self):
@@ -1109,15 +1114,18 @@ if __name__ == "__main__":
         parsed_cred = SafariBooks.parse_cred(pre_cred)
 
         if not parsed_cred:
-            arguments.error("invalid credential: %s" % (
-                args_parsed.cred if args_parsed.cred else (user_email + ":*******")
-            ))
+            arguments.error(
+                (
+                    "invalid credential: %s"
+                    % (args_parsed.cred or user_email + ":*******")
+                )
+            )
+
 
         args_parsed.cred = parsed_cred
 
-    else:
-        if args_parsed.no_cookies:
-            arguments.error("invalid option: `--no-cookies` is valid only if you use the `--cred` option")
+    elif args_parsed.no_cookies:
+        arguments.error("invalid option: `--no-cookies` is valid only if you use the `--cred` option")
 
     SafariBooks(args_parsed)
     # Hint: do you want to download more then one book once, initialized more than one instance of `SafariBooks`...
